@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Desktop</title>
+
+    <style>
+        body{
+            padding:0;
+            margin:0;
+            background-color: #ddd;
+        }
+        #remote_video{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <video id="remote_video" controls></video>
+
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@0.3.20/dist/peer.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const config = {peer_id : null, socket_id : null};
+
+        window.$ = q => document.querySelector(q);
+        window.$$ = q => document.querySelectorAll(q);
+        window.log = (...q) => console.log(...q);
+
+        const socket = io();
+        let peer = new Peer();
+        let target_socket_id = window.location.href.split('/');
+        target_socket_id = target_socket_id[target_socket_id.length - 1];
+
+        peer.on('open', function(peer_id){
+            config.peer_id = peer_id;
+            setup();
+        });
+
+        peer.on('call', function(call){
+            call.answer();
+            call.on('stream', function(remoteStream){
+                let remoteVideo = $('#remote_video');
+                let remoteVideoPlayed = false;
+                remoteVideo.addEventListener('loadeddata', function() {
+                    if(!remoteVideoPlayed){
+                        remoteVideo.play();
+                    }
+                    remoteVideoPlayed = true;
+                }, false);
+                remoteVideo.srcObject = remoteStream;
+            });
+        });
+
+        socket.on('connect', function(){
+            config.socket_id = socket.id;
+            setup();
+        });
+
+        function setup(){
+            if(config.peer_id !== null && config.socket_id !== null){
+                socket.emit('register_peer_id', config.peer_id);
+                socket.emit('call', target_socket_id);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RealTime P2P</title>
+    <style>
+        body{
+            margin:0;
+            padding:0;
+            color:#444;
+        }
+        #step-1{
+            background-color:#ddd;
+            width:100%;
+            height:100%;
+            position: fixed;
+            top:0;left:0;bottom:0;right:0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: row;
+        }
+        #step-1-desktop-container > p, #step-1-video-chat-container > p{
+            color:#666;
+            text-align: center;
+        }
+        #step-1-video-chat-container{
+            margin-left:40px;
+        }
+        #step-1-desktop, #step-1-video-chat{
+            width:350px;
+            height:100px;
+            background-color:#fff;
+            box-sizing: border-box;
+            text-align: center;
+            box-shadow:0 0 10px rgba(0,0,0,.1);
+            border-radius:5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #step-1-desktop-container > h1, #step-1-video-chat-container > h1{
+            color:#444;
+            text-align: center;
+        }
+        #step-1-desktop > span, #step-1-video-chat > span{
+            margin-bottom:10px;
+        }
+        #step-1-desktop > input, #step-1-video-chat > input{
+            padding: 5px 10px;
+            width: 80%;
+        }
+
+
+        #step-2{
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            right: 0;
+            left: 0;
+            bottom: 0;
+            top: 0;
+            background-color:#ddd;
+        }
+        #step-2-local{
+            width:200px;
+            height:160px;
+            position: fixed;
+            bottom:20px;
+            right:20px;
+        }
+        #step-2-remote{
+            width:100%;
+            height:100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="step-1">
+        <div id="step-1-desktop-container">
+            <h1>Desktop Sharing</h1>
+            <div id="step-1-desktop">
+                <span>your desktop url:</span>
+                <input placeholder="loading..." type="text" readonly/>
+            </div>
+            <p>send top url for your friend and wait!<br/>Don't close this page</p>
+        </div>
+        <div id="step-1-video-chat-container">
+            <h1>Video Chat</h1>
+            <div id="step-1-video-chat">
+                <span>video chat url:</span>
+                <input placeholder="loading..." type="text" readonly>
+            </div>
+            <p>send to url for your friend and wait!<br>Don't close this page</p>
+        </div>
+    </div>
+
+    <div id="step-2">
+        <video id="step-2-remote" controls></video>
+        <video controls id="step-2-local"></video>
+    </div>
+
+    <footer style="position: fixed;font-size:15px;font-family:Tahoma;width:100%;bottom:0;left: 0;right: 0;text-align: center;background: #444;color:#fff;padding: 6px;">
+        Developed with <span style="font-size: 20px;color:mediumvioletred">♥</span> By <a href="https://profile.ir/akdev" style="color:#fff;">AKDEV</a>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@0.3.20/dist/peer.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        navigator.getUserMedia = ( navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+        window.config = {url : window.location.href.substr(0, window.location.href.length-1), socket_id : null, peer_id : null, target_peer_id : null};
+        window.$ = q => document.querySelector(q);
+        window.$$ = q => document.querySelectorAll(q);
+        window.log = (...q) => console.log(...q);
+
+        const peer = new Peer();
+        const socket = io();
+
+        socket.on('connect', function () {
+            config.socket_id = socket.id;
+            setup();
+        });
+
+        socket.on('call', function (target_peer_id) {
+            config.target_peer_id = target_peer_id;
+
+            if(navigator.mediaDevices.getDisplayMedia) {
+                navigator.mediaDevices.getDisplayMedia({video: true}).then(handleStream, handleError).catch(handleError);
+            }else if(navigator.getDisplayMedia){
+                navigator.getDisplayMedia({video: true, audio : true}).then(handleStream, handleError).catch(handleError);
+            }
+        });
+
+        peer.on('open', function(peer_id){
+            config.peer_id = peer_id;
+            setup();
+        });
+
+        peer.on('call', function (call) {
+            $('#step-2').style.display = 'block';
+            $('#step-1').style.display = 'none';
+            navigator.mediaDevices.getUserMedia({video : true, audio : true}).then(localStream => {
+                const localVideo = $('#step-2-local');
+                localVideo.srcObject = localStream;
+                localVideo.play();
+
+                call.answer(localStream);
+            });
+            call.on('stream', remoteStream => {
+                const remoteVideo = $('#step-2-remote');
+                remoteVideo.srcObject = remoteStream;
+                remoteVideo.play();
+            });
+        });
+
+        function handleStream(localStream){
+            let call = peer.call(config.target_peer_id, localStream);
+        }
+        function handleError(err){
+            log(err);
+        }
+        function setup(){
+            if(config.socket_id !== null && config.peer_id !== null){
+                socket.emit('register_desktop', config.peer_id);
+                $('#step-1-desktop input').value = config.url + '/desktop/' + config.socket_id;
+
+                socket.emit('register_webcam', config.peer_id);
+                $('#step-1-video-chat input').value = config.url + '/webcam/' + config.peer_id;
+
+                socket.emit('register_peer_id', config.peer_id);
+            }
+        }
+
+
+        $('#step-1-desktop input').onclick = copyInputData;
+        $('#step-1-video-chat input').onclick = copyInputData;
+        function copyInputData(){
+            if(this.value.trim() === ''){
+                return null;
+            }
+            this.select();
+            document.execCommand('copy');
+            alert('url copied to clipboard!');
+        }
+    </script>
+</body>
+</html>
