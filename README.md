@@ -1,4 +1,4 @@
-![Demo Image](https://github.com/amirkabiri/desktop-sharing/master/image.png "demo image")
+![Demo Image](https://raw.githubusercontent.com/amirkabiri/desktop-sharing/master/image.png "demo image")
 
 # Introduction
 This is a simple project for one to one video chat and desktop sharing
