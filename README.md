@@ -21,4 +21,4 @@ using npm :
 #### 4. run node server :
 	node index.js
 #### 5. enjoy it !
-	open http://localhost:80
+	start http://localhost:80
